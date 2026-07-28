@@ -11,6 +11,7 @@ class SourceDocument(db.Model):
     title = db.Column(db.String(255))
     title_es = db.Column(db.String(255))
     english_locked = db.Column(db.Boolean, default=False)
+    queue_status = db.Column(db.String(32))
     revision = db.Column(db.String(32), default="1.0")
     sha256 = db.Column(db.String(64), unique=True, nullable=False)
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)

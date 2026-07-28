@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
+{% if busy %}<meta http-equiv="refresh" content="10">{% endif %}
 <div class="card">
   <form method="post" action="{{ url_for('upload') }}"
         enctype="multipart/form-data">
@@ -29,7 +30,11 @@
     <tr>
       <td><a href="{{ url_for('document', doc_id=d.id) }}">{{ d.title or d.filename }}</a></td>
       <td>{{ d.uploaded_at.strftime('%Y-%m-%d %H:%M') }}</td>
-      <td>{{ label.get(phase(d), phase(d)) }}</td>
+      <td>{% if d.queue_status == 'queued' %}
+            <span style="color:#737272">queued</span>
+          {% elif d.queue_status == 'processing' %}
+            <span style="color:#00AEEF">processing…</span>
+          {% else %}{{ label.get(phase(d), phase(d)) }}{% endif %}</td>
       <td>{{ d.blocks|length }}</td>
       <td>{% set done = d.blocks|selectattr('status_es', 'equalto', 'approved')|list|length %}
           {% if d.blocks|length and done == d.blocks|length %}

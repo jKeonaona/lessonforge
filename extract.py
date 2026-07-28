@@ -62,8 +62,14 @@ def _pick_title(pages, drop):
     parts = []
     for s in ordered[:4]:
         c = _title_candidate(s)
-        if c:
-            parts.append(c.rstrip(":").strip())
+        if not c:
+            continue
+        c = c.rstrip(":").strip()
+        low = c.lower()
+        if any(low == p.lower() or low in p.lower()
+               or p.lower() in low for p in parts):
+            continue
+        parts.append(c)
     if not parts:
         return None
     return ": ".join(p.title() for p in parts[:3])

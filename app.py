@@ -12,6 +12,7 @@ from translate import (run_translation_pass, edit_translation,
                        verify_translations, translate_title)
 from render import build_docx, docx_filename
 from batch import ingest, run_pipeline
+from worker import enqueue, start as start_worker, reset_orphans
 
 
 def create_app():
@@ -25,6 +26,9 @@ def create_app():
 
     with app.app_context():
         db.create_all()
+        reset_orphans()
+
+    start_worker(app)
 
     @app.route("/health")
     def health():
@@ -37,9 +41,12 @@ def create_app():
         pending = (db.session.query(ChangeLog)
                    .filter(ChangeLog.phase == "correction")
                    .filter(ChangeLog.status == "pending").count())
+        busy = SourceDocument.query.filter(
+            SourceDocument.queue_status.in_(
+                ["queued", "processing"])).count()
         return render_template("index.html", docs=docs,
                                phase=doc_phase, label=PHASE_LABEL,
-                               pending=pending)
+                               pending=pending, busy=busy)
 
     @app.route("/upload", methods=["POST"])
     def upload():
@@ -60,19 +67,15 @@ def create_app():
                 skipped += 1
             else:
                 made.append(doc)
-
-        results = []
-        if auto:
-            for doc in made:
-                results.append("%s: %s" % (doc.filename,
-                                           run_pipeline(doc.id)))
+                if auto:
+                    enqueue(doc.id)
 
         parts = ["%d uploaded" % len(made)]
         if skipped:
             parts.append("%d duplicates skipped" % skipped)
+        if auto and made:
+            parts.append("processing in the background")
         flash(", ".join(parts))
-        for r in results:
-            flash(r)
 
         if len(made) == 1 and not auto:
             return redirect(url_for("document", doc_id=made[0].id))
@@ -81,8 +84,9 @@ def create_app():
     @app.route("/document/<int:doc_id>/pipeline", methods=["POST"])
     def pipeline(doc_id):
         doc = SourceDocument.query.get_or_404(doc_id)
-        flash("%s: %s" % (doc.filename, run_pipeline(doc.id)))
-        return redirect(url_for("document", doc_id=doc.id))
+        enqueue(doc.id)
+        flash("%s queued." % (doc.title or doc.filename))
+        return redirect(url_for("index"))
 
     @app.route("/queue")
     def queue():
@@ -106,10 +110,21 @@ def create_app():
 
     @app.route("/queue/<int:change_id>/<action>", methods=["POST"])
     def queue_decide(change_id, action):
+        ch = ChangeLog.query.get_or_404(change_id)
+        blk = Block.query.get(ch.block_id)
+        doc_id = blk.source_doc_id if blk else None
         if action == "approve":
             apply_change(change_id)
         else:
             reject_change(change_id)
+        if doc_id:
+            remaining = (db.session.query(ChangeLog)
+                         .join(Block, ChangeLog.block_id == Block.id)
+                         .filter(Block.source_doc_id == doc_id)
+                         .filter(ChangeLog.phase == "correction")
+                         .filter(ChangeLog.status == "pending").count())
+            if not remaining:
+                enqueue(doc_id)
         return redirect(url_for("queue"))
 
     @app.route("/document/<int:doc_id>")
@@ -161,7 +176,15 @@ def create_app():
             apply_change(change_id)
         else:
             reject_change(change_id)
-        return redirect(url_for("review", doc_id=blk.source_doc_id))
+        doc_id = blk.source_doc_id
+        remaining = (db.session.query(ChangeLog)
+                     .join(Block, ChangeLog.block_id == Block.id)
+                     .filter(Block.source_doc_id == doc_id)
+                     .filter(ChangeLog.phase == "correction")
+                     .filter(ChangeLog.status == "pending").count())
+        if not remaining:
+            enqueue(doc_id)
+        return redirect(url_for("review", doc_id=doc_id))
 
     @app.route("/document/<int:doc_id>/lock", methods=["POST"])
     def lock_english(doc_id):
