@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <div class="tag">correction review</div>
+  <h2 style="margin:6px 0 0">{{ doc.filename }}</h2>
+  <p style="font-size:13px;color:#737272">
+    {{ pending|length }} pending, {{ decided|length }} decided.
+    <a href="{{ url_for('document', doc_id=doc.id) }}">Back to document</a>
+  </p>
+</div>
+
+{% for c in pending %}
+<div class="card">
+  <div class="tag">block {{ c.seq }} &middot; {{ c.reason_hint }}</div>
+  <div style="margin:8px 0;padding:8px;background:#fff0f0;
+              border-left:3px solid #cc4444;font-size:14px">
+    {{ c.before }}
+  </div>
+  <div style="margin:8px 0;padding:8px;background:#f0fff2;
+              border-left:3px solid #44aa55;font-size:14px">
+    {{ c.after }}
+  </div>
+  <form method="post" style="display:inline"
+        action="{{ url_for('decide', change_id=c.id, action='approve') }}">
+    <button type="submit">Approve</button>
+  </form>
+  <form method="post" style="display:inline"
+        action="{{ url_for('decide', change_id=c.id, action='reject') }}">
+    <button type="submit" style="background:#737272">Reject</button>
+  </form>
+</div>
+{% else %}
+<div class="card">No pending corrections.</div>
+{% endfor %}
+
+{% if decided %}
+<div class="card">
+  <div class="tag">decision history</div>
+  <table>
+    <tr><th>Block</th><th>Status</th><th>Change</th><th>When</th></tr>
+    {% for c in decided %}
+    <tr>
+      <td>{{ c.seq }}</td>
+      <td>{{ c.status }}</td>
+      <td style="font-size:12px">{{ c.after[:80] }}</td>
+      <td>{{ c.ts.strftime('%Y-%m-%d %H:%M') }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+{% endblock %}

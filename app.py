@@ -4,8 +4,9 @@ from flask import (Flask, jsonify, render_template, request,
                    redirect, url_for, flash)
 from werkzeug.utils import secure_filename
 from config import Config
-from models import db, SourceDocument, Block
+from models import db, SourceDocument, Block, ChangeLog
 from extract import extract_blocks
+from corrections import run_correction_pass, apply_change, reject_change
 
 
 def create_app():
@@ -78,6 +79,47 @@ def create_app():
         blocks = Block.query.filter_by(
             source_doc_id=doc.id).order_by(Block.seq).all()
         return render_template("document.html", doc=doc, blocks=blocks)
+
+    @app.route("/document/<int:doc_id>/correct", methods=["POST"])
+    def correct(doc_id):
+        doc = SourceDocument.query.get_or_404(doc_id)
+        try:
+            n = run_correction_pass(doc.id)
+            doc.status = "corrections_pending" if n else "no_corrections"
+            db.session.commit()
+            flash("%d corrections proposed." % n)
+        except Exception as exc:
+            flash("Correction pass failed: %s" % exc)
+        return redirect(url_for("review", doc_id=doc.id))
+
+    @app.route("/document/<int:doc_id>/review")
+    def review(doc_id):
+        doc = SourceDocument.query.get_or_404(doc_id)
+        rows = (db.session.query(ChangeLog, Block)
+                .join(Block, ChangeLog.block_id == Block.id)
+                .filter(Block.source_doc_id == doc.id,
+                        ChangeLog.phase == "correction")
+                .order_by(Block.seq).all())
+
+        def pack(ch, blk):
+            return {"id": ch.id, "seq": blk.seq, "before": ch.before,
+                    "after": ch.after, "status": ch.status, "ts": ch.ts,
+                    "reason_hint": ch.phase}
+
+        pending = [pack(c, b) for c, b in rows if c.status == "pending"]
+        decided = [pack(c, b) for c, b in rows if c.status != "pending"]
+        return render_template("review.html", doc=doc,
+                               pending=pending, decided=decided)
+
+    @app.route("/change/<int:change_id>/<action>", methods=["POST"])
+    def decide(change_id, action):
+        ch = ChangeLog.query.get_or_404(change_id)
+        blk = Block.query.get(ch.block_id)
+        if action == "approve":
+            apply_change(change_id)
+        else:
+            reject_change(change_id)
+        return redirect(url_for("review", doc_id=blk.source_doc_id))
 
     return app
 

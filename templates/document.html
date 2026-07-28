@@ -7,6 +7,13 @@
     {{ blocks|length }} blocks extracted.
     <a href="{{ url_for('index') }}">Back</a>
   </p>
+  <form method="post"
+        action="{{ url_for('correct', doc_id=doc.id) }}">
+    <button type="submit">Run correction pass</button>
+  </form>
+  <p style="font-size:13px;margin-top:10px">
+    <a href="{{ url_for('review', doc_id=doc.id) }}">Review corrections</a>
+  </p>
 </div>
 
 <div class="card">
