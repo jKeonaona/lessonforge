@@ -211,7 +211,8 @@ def create_app():
             return redirect(url_for("document", doc_id=doc.id))
         try:
             n = run_translation_pass(doc.id)
-            translate_title(doc.id)
+            if not doc.title_es:
+                translate_title(doc.id)
             flash("%d blocks translated." % n)
         except Exception as exc:
             flash("Translation failed: %s" % exc)

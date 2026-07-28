@@ -32,6 +32,13 @@ Requirements:
 - Do not add, remove, soften, or explain content. Translate what is
   there.
 - Do not translate proper nouns or agency names.
+- Common names for animals, equipment, and hazards ARE translated, even
+  when listed as alternate names. A list of alternate names for an
+  animal must be fully translated, for example "cougars, pumas,
+  panthers, catamounts, and ghost cats" becomes "pumas, panteras,
+  gatos monteses y gatos fantasma". Do not leave any alternate name in
+  English. This does not apply to brand names, trademarks, or the
+  proper names of agencies and organizations.
 
 TERMINOLOGY. The following translations are locked. Use them exactly.
 Do not substitute synonyms:
@@ -270,9 +277,19 @@ def verify_translations(doc_id, actor="system"):
 
 
 TITLE_SYSTEM = """Translate this workplace safety training document
-title into Mexican Spanish. Return ONLY the translated title as plain
-text, with no quotes, no explanation, and no punctuation added.
-Preserve title capitalization conventions."""
+title into Mexican Spanish.
+
+TERMINOLOGY. The following translations are locked. Use them exactly.
+Do not substitute synonyms, and do not choose a shorter or more common
+alternative:
+%s
+
+The title must use the same terminology as the body of the document.
+If a term above appears in the title, use the locked translation.
+
+Return ONLY the translated title as plain text, with no quotes, no
+explanation, and no added punctuation. Preserve title capitalization
+conventions."""
 
 
 def translate_title(doc_id):
@@ -281,8 +298,16 @@ def translate_title(doc_id):
     doc = SourceDocument.query.get(doc_id)
     if not doc or not doc.title:
         return None
+    terms = GlossaryTerm.query.filter_by(is_locked=True).all()
+    lines = []
+    for t in terms:
+        line = "  %s = %s" % (t.term_en, t.term_es)
+        if t.notes:
+            line += "   (%s)" % t.notes
+        lines.append(line)
     resp = _client().messages.create(
-        model=MODEL, max_tokens=200, system=TITLE_SYSTEM,
+        model=MODEL, max_tokens=200,
+        system=TITLE_SYSTEM % "\n".join(lines),
         messages=[{"role": "user", "content": doc.title}],
     )
     es = "".join(

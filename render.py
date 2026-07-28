@@ -108,5 +108,4 @@ def build_docx(doc, lang="en"):
 
 
 def docx_filename(doc, lang="en"):
-    base = doc.title_es if (lang == "es" and doc.title_es) else doc.title
-    return "%s-%s.docx" % (slug(base or doc.filename), lang.upper())
+    return "%s-%s.docx" % (slug(doc.title or doc.filename), lang.upper())
