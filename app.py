@@ -155,6 +155,28 @@ def create_app():
         db.session.commit()
         return redirect(url_for("document", doc_id=doc.id))
 
+    @app.route("/document/<int:doc_id>/lesson")
+    def lesson(doc_id):
+        doc = SourceDocument.query.get_or_404(doc_id)
+        blocks = (Block.query.filter_by(source_doc_id=doc.id)
+                  .order_by(Block.seq).all())
+        rendered = []
+        for b in blocks:
+            text = (b.text_en or "").strip()
+            if not text:
+                continue
+            if b.block_type == "list_item":
+                if rendered and rendered[-1]["kind"] == "list":
+                    rendered[-1]["items"].append(text)
+                else:
+                    rendered.append({"kind": "list", "items": [text]})
+            elif b.block_type == "heading":
+                rendered.append({"kind": "heading", "text": text})
+            else:
+                rendered.append({"kind": "paragraph", "text": text})
+        return render_template("lesson.html", doc=doc, rendered=rendered,
+                               phase=doc_phase(doc), label=PHASE_LABEL)
+
     return app
 
 

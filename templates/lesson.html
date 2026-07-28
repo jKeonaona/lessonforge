@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <div class="tag">{{ label.get(phase, phase) }}</div>
+  <p style="font-size:13px;color:#737272;margin:6px 0 0">
+    <a href="{{ url_for('document', doc_id=doc.id) }}">Edit workflow</a>
+    &middot; <a href="{{ url_for('review', doc_id=doc.id) }}">Correction history</a>
+    &middot; <a href="{{ url_for('index') }}">All documents</a>
+  </p>
+</div>
+
+<div class="card" style="padding:40px 48px">
+  <h1 style="font-family:Arial;font-size:26px;color:#00AEEF;
+             margin:0 0 4px;letter-spacing:.5px">
+    {{ doc.title or doc.filename }}</h1>
+  <div style="border-bottom:3px solid #00AEEF;margin-bottom:24px"></div>
+
+  {% for item in rendered %}
+    {% if item.kind == 'heading' %}
+      <h2 style="font-family:Arial;font-size:15px;color:#222;
+                 text-transform:uppercase;letter-spacing:.5px;
+                 margin:26px 0 8px">{{ item.text }}</h2>
+    {% elif item.kind == 'paragraph' %}
+      <p style="font-family:Arial;font-size:14px;line-height:1.6;
+                margin:0 0 12px">{{ item.text }}</p>
+    {% elif item.kind == 'list' %}
+      <ul style="font-family:Arial;font-size:14px;line-height:1.6;
+                 margin:0 0 14px;padding-left:22px">
+        {% for li in item.items %}<li style="margin-bottom:5px">{{ li }}</li>{% endfor %}
+      </ul>
+    {% endif %}
+  {% endfor %}
+
+  <div style="border-top:1px solid #ddd;margin-top:30px;padding-top:10px;
+              font-size:11px;color:#737272">
+    Revision {{ doc.revision or '1.0' }}
+  </div>
+</div>
+{% endblock %}

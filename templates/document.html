@@ -13,6 +13,8 @@
   <div style="font-size:12px;color:#737272;margin-bottom:12px">
     source: {{ doc.filename }} &middot; {{ blocks|length }} blocks
   </div>
+  <p style="font-size:13px;margin:0 0 12px">
+    <a href="{{ url_for('lesson', doc_id=doc.id) }}">View lesson</a></p>
 
   {% if phase == 'extracted' %}
     <form method="post" action="{{ url_for('correct', doc_id=doc.id) }}">
