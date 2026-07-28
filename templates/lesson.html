@@ -3,7 +3,12 @@
 <div class="card">
   <div class="tag">{{ label.get(phase, phase) }}</div>
   <p style="font-size:13px;color:#737272;margin:6px 0 0">
-    <a href="{{ url_for('document', doc_id=doc.id) }}">Edit workflow</a>
+    {% if lang == 'es' %}
+      <a href="{{ url_for('lesson', doc_id=doc.id) }}">English version</a>
+    {% else %}
+      <a href="{{ url_for('lesson', doc_id=doc.id, lang='es') }}">Versión en español</a>
+    {% endif %}
+    &middot; <a href="{{ url_for('document', doc_id=doc.id) }}">Edit workflow</a>
     &middot; <a href="{{ url_for('review', doc_id=doc.id) }}">Correction history</a>
     &middot; <a href="{{ url_for('index') }}">All documents</a>
   </p>
@@ -34,6 +39,7 @@
   <div style="border-top:1px solid #ddd;margin-top:30px;padding-top:10px;
               font-size:11px;color:#737272">
     Revision {{ doc.revision or '1.0' }}
+    &middot; {% if lang == 'es' %}Español (México){% else %}English{% endif %}
   </div>
 </div>
 {% endblock %}

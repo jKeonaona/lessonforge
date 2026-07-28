@@ -64,4 +64,20 @@
   {% endif %}
 </div>
 {% endfor %}
+
+<div class="card" style="text-align:center">
+  {% if approved == total %}
+    <p style="font-size:14px;margin:0 0 12px">
+      All {{ total }} blocks approved.</p>
+    <a href="{{ url_for('lesson', doc_id=doc.id, lang='es') }}">
+      <button type="button">View Spanish lesson</button></a>
+    <a href="{{ url_for('lesson', doc_id=doc.id) }}">
+      <button type="button" style="background:#737272">View English lesson</button></a>
+  {% else %}
+    <p style="font-size:14px;color:#737272;margin:0 0 12px">
+      {{ total - approved }} blocks still need approval.</p>
+    <a href="{{ url_for('document', doc_id=doc.id) }}">
+      <button type="button" style="background:#737272">Back to document</button></a>
+  {% endif %}
+</div>
 {% endblock %}

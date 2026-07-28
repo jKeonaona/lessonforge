@@ -160,11 +160,15 @@ def create_app():
     @app.route("/document/<int:doc_id>/lesson")
     def lesson(doc_id):
         doc = SourceDocument.query.get_or_404(doc_id)
+        lang = request.args.get("lang", "en")
         blocks = (Block.query.filter_by(source_doc_id=doc.id)
                   .order_by(Block.seq).all())
         rendered = []
         for b in blocks:
-            text = (b.text_en or "").strip()
+            if lang == "es":
+                text = (b.text_es or "").strip()
+            else:
+                text = (b.text_en or "").strip()
             if not text:
                 continue
             if b.block_type == "list_item":
@@ -177,7 +181,8 @@ def create_app():
             else:
                 rendered.append({"kind": "paragraph", "text": text})
         return render_template("lesson.html", doc=doc, rendered=rendered,
-                               phase=doc_phase(doc), label=PHASE_LABEL)
+                               phase=doc_phase(doc), label=PHASE_LABEL,
+                               lang=lang)
 
     @app.route("/document/<int:doc_id>/spanish")
     def spanish(doc_id):
