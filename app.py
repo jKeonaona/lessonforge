@@ -167,9 +167,9 @@ def create_app():
                 continue
             if b.block_type == "list_item":
                 if rendered and rendered[-1]["kind"] == "list":
-                    rendered[-1]["items"].append(text)
+                    rendered[-1]["entries"].append(text)
                 else:
-                    rendered.append({"kind": "list", "items": [text]})
+                    rendered.append({"kind": "list", "entries": [text]})
             elif b.block_type == "heading":
                 rendered.append({"kind": "heading", "text": text})
             else:
