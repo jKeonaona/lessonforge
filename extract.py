@@ -3,6 +3,9 @@ from collections import Counter
 import pdfplumber
 
 BULLET = re.compile(r"^\s*[\u2022\u25cf\u25aa\uf0b7o\-\*]\s+")
+BANNERISH = re.compile(r"(https?://|www\.|\d{3}[-.\s]?\d{3}[-.\s]?\d{4})",
+                       re.I)
+CONTINUES = re.compile(r"[a-z,;:]$")
 
 
 def _is_heading(line):
@@ -28,8 +31,29 @@ def _furniture(pages):
     return {line for line, n in counts.items() if n >= threshold}
 
 
+def _pick_title(drop):
+    """Choose a lesson title from repeating page furniture.
+    Prefers ALL-CAPS lines that are not phone numbers or URLs."""
+    best = None
+    for line in drop:
+        s = line.strip(" .")
+        if len(s) < 6 or len(s) > 70:
+            continue
+        if BANNERISH.search(s):
+            continue
+        letters = [c for c in s if c.isalpha()]
+        if not letters:
+            continue
+        if sum(1 for c in letters if c.isupper()) / len(letters) < 0.85:
+            continue
+        if best is None or len(s) > len(best):
+            best = s
+    return best.title() if best else None
+
+
 def extract_blocks(path):
-    """Return list of dicts: {seq, block_type, text_en}."""
+    """Return (blocks, title). Blocks are dicts with seq, block_type,
+    text_en. Wrapped continuation lines are joined into their parent."""
     pages = []
     with pdfplumber.open(path) as pdf:
         for page in pdf.pages:
@@ -37,6 +61,7 @@ def extract_blocks(path):
             pages.append(text.split("\n"))
 
     drop = _furniture(pages)
+    title = _pick_title(drop)
     blocks = []
     buffer = []
 
@@ -62,6 +87,10 @@ def extract_blocks(path):
                     "block_type": "list_item",
                     "text_en": BULLET.sub("", line).strip(),
                 })
+            elif (blocks and not buffer
+                  and blocks[-1]["block_type"] == "list_item"
+                  and CONTINUES.search(blocks[-1]["text_en"])):
+                blocks[-1]["text_en"] += " " + line
             else:
                 buffer.append(line)
         flush()
@@ -69,4 +98,4 @@ def extract_blocks(path):
 
     for i, b in enumerate(blocks, start=1):
         b["seq"] = i
-    return blocks
+    return blocks, title

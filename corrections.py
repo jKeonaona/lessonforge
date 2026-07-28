@@ -69,8 +69,7 @@ def run_correction_pass(doc_id, actor="system"):
         for i in range(0, len(seq), n):
             yield seq[i:i + n]
 
-    items = []
-    for group in chunk(blocks, 5):
+    def sweep(group):
         payload = "\n".join(
             "[%d] %s" % (b.seq, b.text_en or "") for b in group
         )
@@ -89,7 +88,25 @@ def run_correction_pass(doc_id, actor="system"):
             if raw.startswith("json"):
                 raw = raw[4:]
             raw = raw.strip()
-        items.extend(json.loads(raw))
+        try:
+            return json.loads(raw)
+        except ValueError:
+            return []
+
+    merged = {}
+    for group in chunk(blocks, 5):
+        for _ in range(2):
+            for item in sweep(group):
+                seq = item.get("seq")
+                if seq is None:
+                    continue
+                prior = merged.get(seq)
+                if prior is None:
+                    merged[seq] = item
+                elif (prior.get("severity") == "minor"
+                      and item.get("severity") == "review"):
+                    merged[seq] = item
+    items = list(merged.values())
 
     created = 0
     for item in items:

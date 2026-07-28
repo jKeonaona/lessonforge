@@ -59,7 +59,9 @@ def create_app():
         db.session.commit()
 
         try:
-            for b in extract_blocks(path):
+            parsed, title = extract_blocks(path)
+            doc.title = title
+            for b in parsed:
                 db.session.add(Block(
                     source_doc_id=doc.id,
                     seq=b["seq"],
