@@ -31,24 +31,42 @@ def _furniture(pages):
     return {line for line, n in counts.items() if n >= threshold}
 
 
-def _pick_title(drop):
-    """Choose a lesson title from repeating page furniture.
-    Prefers ALL-CAPS lines that are not phone numbers or URLs."""
-    best = None
-    for line in drop:
-        s = line.strip(" .")
-        if len(s) < 6 or len(s) > 70:
-            continue
-        if BANNERISH.search(s):
-            continue
-        letters = [c for c in s if c.isalpha()]
-        if not letters:
-            continue
-        if sum(1 for c in letters if c.isupper()) / len(letters) < 0.85:
-            continue
-        if best is None or len(s) > len(best):
-            best = s
-    return best.title() if best else None
+def _title_candidate(s):
+    """Return the cleaned line if it looks like part of a title."""
+    s = s.strip(" .")
+    if len(s) < 4 or len(s) > 70:
+        return None
+    if BANNERISH.search(s):
+        return None
+    letters = [c for c in s if c.isalpha()]
+    if not letters:
+        return None
+    if sum(1 for c in letters if c.isupper()) / len(letters) < 0.85:
+        return None
+    return s
+
+
+def _pick_title(pages, drop):
+    """Build a title from repeating furniture lines, in the order they
+    appear on the first page. A banner split across two lines becomes
+    "Category: Subtitle"."""
+    ordered = []
+    for lines in pages:
+        for raw in lines:
+            s = raw.strip()
+            if s in drop and s not in ordered:
+                ordered.append(s)
+        if ordered:
+            break
+
+    parts = []
+    for s in ordered[:4]:
+        c = _title_candidate(s)
+        if c:
+            parts.append(c.rstrip(":").strip())
+    if not parts:
+        return None
+    return ": ".join(p.title() for p in parts[:3])
 
 
 def extract_blocks(path):
@@ -61,7 +79,7 @@ def extract_blocks(path):
             pages.append(text.split("\n"))
 
     drop = _furniture(pages)
-    title = _pick_title(drop)
+    title = _pick_title(pages, drop)
     blocks = []
     buffer = []
 

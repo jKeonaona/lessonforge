@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <div class="tag">review queue</div>
+  <h2 style="margin:6px 0 0">
+    {{ items|length }} corrections across {{ docs|length }} documents</h2>
+  <p style="font-size:13px;color:#737272">
+    <a href="{{ url_for('index') }}">All documents</a></p>
+</div>
+
+{% for d in docs %}
+<div class="card">
+  <div class="tag">{{ d.title or d.filename }}</div>
+  {% for c in items if c.doc_id == d.id %}
+  <div style="padding:12px 0;border-bottom:1px solid #f0f0f0">
+    <div style="font-size:11px;color:#737272;margin-bottom:6px">
+      block {{ c.seq }}</div>
+    <div style="padding:8px;background:#fff0f0;
+                border-left:3px solid #cc4444;font-size:13px">
+      {{ c.before }}</div>
+    <div style="padding:8px;background:#f0fff2;margin-top:4px;
+                border-left:3px solid #44aa55;font-size:13px">
+      {{ c.after }}</div>
+    <div style="margin-top:8px">
+      <form method="post" style="display:inline"
+            action="{{ url_for('queue_decide', change_id=c.id, action='approve') }}">
+        <button type="submit">Approve</button></form>
+      <form method="post" style="display:inline"
+            action="{{ url_for('queue_decide', change_id=c.id, action='reject') }}">
+        <button type="submit" style="background:#737272">Reject</button></form>
+    </div>
+  </div>
+  {% endfor %}
+  <p style="font-size:13px;margin-top:10px">
+    <a href="{{ url_for('document', doc_id=d.id) }}">Open document</a></p>
+</div>
+{% else %}
+<div class="card">Nothing waiting for review.</div>
+{% endfor %}
+{% endblock %}

@@ -34,8 +34,12 @@ def create_app():
     def index():
         docs = SourceDocument.query.order_by(
             SourceDocument.uploaded_at.desc()).all()
+        pending = (db.session.query(ChangeLog)
+                   .filter(ChangeLog.phase == "correction")
+                   .filter(ChangeLog.status == "pending").count())
         return render_template("index.html", docs=docs,
-                               phase=doc_phase, label=PHASE_LABEL)
+                               phase=doc_phase, label=PHASE_LABEL,
+                               pending=pending)
 
     @app.route("/upload", methods=["POST"])
     def upload():
@@ -79,6 +83,34 @@ def create_app():
         doc = SourceDocument.query.get_or_404(doc_id)
         flash("%s: %s" % (doc.filename, run_pipeline(doc.id)))
         return redirect(url_for("document", doc_id=doc.id))
+
+    @app.route("/queue")
+    def queue():
+        rows = (db.session.query(ChangeLog, Block, SourceDocument)
+                .join(Block, ChangeLog.block_id == Block.id)
+                .join(SourceDocument,
+                      Block.source_doc_id == SourceDocument.id)
+                .filter(ChangeLog.phase == "correction")
+                .filter(ChangeLog.status == "pending")
+                .order_by(SourceDocument.id, Block.seq).all())
+        items = [{"id": c.id, "doc_id": d.id, "seq": b.seq,
+                  "before": c.before, "after": c.after}
+                 for c, b, d in rows]
+        seen = []
+        docs = []
+        for c, b, d in rows:
+            if d.id not in seen:
+                seen.append(d.id)
+                docs.append(d)
+        return render_template("queue.html", items=items, docs=docs)
+
+    @app.route("/queue/<int:change_id>/<action>", methods=["POST"])
+    def queue_decide(change_id, action):
+        if action == "approve":
+            apply_change(change_id)
+        else:
+            reject_change(change_id)
+        return redirect(url_for("queue"))
 
     @app.route("/document/<int:doc_id>")
     def document(doc_id):
