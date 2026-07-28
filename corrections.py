@@ -29,10 +29,20 @@ Do NOT report:
 Rewrite as little as possible. Change only the erroneous words. Preserve
 the original sentence structure exactly.
 
+Before you return, re-read every block a second time looking only for
+missing negations. A dropped "not" or "no" leaves a sentence that reads
+naturally but means the opposite of what the author intended. These are
+the most dangerous errors in safety text and the easiest to skim past.
+Examples of the pattern:
+  "that does make these encounters any less scary" is missing "not"
+  "you should approach the animal" may be missing "not"
+Check each sentence against the evident intent of the surrounding text
+and report every one you find.
+
 Return ONLY a JSON array, no markdown fences and no commentary. Each
 element must be:
   {"seq": <int>, "corrected": "<full corrected block text>",
-   "reason": "<short reason>"}
+   "reason": "<short reason>", "severity": "<minor|review>"}
 
 Return an empty array [] if nothing meets the criteria above."""
 
@@ -60,7 +70,7 @@ def run_correction_pass(doc_id, actor="system"):
             yield seq[i:i + n]
 
     items = []
-    for group in chunk(blocks, 10):
+    for group in chunk(blocks, 5):
         payload = "\n".join(
             "[%d] %s" % (b.seq, b.text_en or "") for b in group
         )
@@ -91,14 +101,19 @@ def run_correction_pass(doc_id, actor="system"):
         after = (item.get("corrected") or "").strip()
         if not after or after == (blk.text_en or "").strip():
             continue
+        sev = (item.get("severity") or "review").strip().lower()
+        auto = sev == "minor"
         db.session.add(ChangeLog(
             block_id=blk.id,
             phase="correction",
             before=blk.text_en,
             after=after,
-            status="pending",
-            actor=actor,
+            status="auto_applied" if auto else "pending",
+            actor="claude" if auto else actor,
         ))
+        if auto:
+            blk.text_en = after
+            blk.status_en = "corrected"
         created += 1
 
     db.session.commit()

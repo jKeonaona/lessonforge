@@ -41,7 +41,7 @@
     {% for c in decided %}
     <tr>
       <td>{{ c.seq }}</td>
-      <td>{{ c.status }}</td>
+      <td>{% if c.status == 'auto_applied' %}auto{% else %}{{ c.status }}{% endif %}</td>
       <td style="font-size:12px">{{ c.after[:80] }}</td>
       <td>{{ c.ts.strftime('%Y-%m-%d %H:%M') }}</td>
     </tr>

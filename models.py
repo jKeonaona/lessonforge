@@ -8,6 +8,8 @@ class SourceDocument(db.Model):
     __tablename__ = "source_document"
     id = db.Column(db.Integer, primary_key=True)
     filename = db.Column(db.String(255), nullable=False)
+    title = db.Column(db.String(255))
+    english_locked = db.Column(db.Boolean, default=False)
     sha256 = db.Column(db.String(64), unique=True, nullable=False)
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
     status = db.Column(db.String(32), default="uploaded")
@@ -62,3 +64,31 @@ class ChangeLog(db.Model):
     status = db.Column(db.String(32), default="pending")
     actor = db.Column(db.String(64))
     ts = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+def doc_phase(doc):
+    """Derive the document phase from actual data, not stored status."""
+    blocks = Block.query.filter_by(source_doc_id=doc.id).all()
+    if not blocks:
+        return "uploaded"
+    ids = [b.id for b in blocks]
+    rows = (ChangeLog.query
+            .filter(ChangeLog.block_id.in_(ids))
+            .filter(ChangeLog.phase == "correction").all())
+    pending = [r for r in rows if r.status == "pending"]
+    if pending:
+        return "corrections_pending"
+    if doc.english_locked:
+        return "english_locked"
+    if rows or doc.status == "pass_run":
+        return "english_ready"
+    return "extracted"
+
+
+PHASE_LABEL = {
+    "uploaded": "Uploaded",
+    "extracted": "Extracted",
+    "corrections_pending": "Corrections awaiting review",
+    "english_ready": "English reviewed",
+    "english_locked": "English locked",
+}

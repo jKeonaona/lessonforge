@@ -4,7 +4,8 @@ from flask import (Flask, jsonify, render_template, request,
                    redirect, url_for, flash)
 from werkzeug.utils import secure_filename
 from config import Config
-from models import db, SourceDocument, Block, ChangeLog
+from models import (db, SourceDocument, Block, ChangeLog,
+                    doc_phase, PHASE_LABEL)
 from extract import extract_blocks
 from corrections import run_correction_pass, apply_change, reject_change
 
@@ -29,7 +30,8 @@ def create_app():
     def index():
         docs = SourceDocument.query.order_by(
             SourceDocument.uploaded_at.desc()).all()
-        return render_template("index.html", docs=docs)
+        return render_template("index.html", docs=docs,
+                               phase=doc_phase, label=PHASE_LABEL)
 
     @app.route("/upload", methods=["POST"])
     def upload():
@@ -78,14 +80,16 @@ def create_app():
         doc = SourceDocument.query.get_or_404(doc_id)
         blocks = Block.query.filter_by(
             source_doc_id=doc.id).order_by(Block.seq).all()
-        return render_template("document.html", doc=doc, blocks=blocks)
+        ph = doc_phase(doc)
+        return render_template("document.html", doc=doc, blocks=blocks,
+                               phase=ph, label=PHASE_LABEL)
 
     @app.route("/document/<int:doc_id>/correct", methods=["POST"])
     def correct(doc_id):
         doc = SourceDocument.query.get_or_404(doc_id)
         try:
             n = run_correction_pass(doc.id)
-            doc.status = "corrections_pending" if n else "no_corrections"
+            doc.status = "pass_run"
             db.session.commit()
             flash("%d corrections proposed." % n)
         except Exception as exc:
@@ -109,7 +113,8 @@ def create_app():
         pending = [pack(c, b) for c, b in rows if c.status == "pending"]
         decided = [pack(c, b) for c, b in rows if c.status != "pending"]
         return render_template("review.html", doc=doc,
-                               pending=pending, decided=decided)
+                               pending=pending, decided=decided,
+                               phase=doc_phase(doc), label=PHASE_LABEL)
 
     @app.route("/change/<int:change_id>/<action>", methods=["POST"])
     def decide(change_id, action):
@@ -120,6 +125,33 @@ def create_app():
         else:
             reject_change(change_id)
         return redirect(url_for("review", doc_id=blk.source_doc_id))
+
+    @app.route("/document/<int:doc_id>/lock", methods=["POST"])
+    def lock_english(doc_id):
+        doc = SourceDocument.query.get_or_404(doc_id)
+        if doc_phase(doc) != "english_ready":
+            flash("Resolve all pending corrections first.")
+            return redirect(url_for("review", doc_id=doc.id))
+        doc.english_locked = True
+        db.session.commit()
+        flash("English locked. Ready for translation.")
+        return redirect(url_for("document", doc_id=doc.id))
+
+    @app.route("/document/<int:doc_id>/unlock", methods=["POST"])
+    def unlock_english(doc_id):
+        doc = SourceDocument.query.get_or_404(doc_id)
+        doc.english_locked = False
+        db.session.commit()
+        flash("English unlocked.")
+        return redirect(url_for("document", doc_id=doc.id))
+
+    @app.route("/document/<int:doc_id>/title", methods=["POST"])
+    def set_title(doc_id):
+        doc = SourceDocument.query.get_or_404(doc_id)
+        new = (request.form.get("title") or "").strip()
+        doc.title = new or None
+        db.session.commit()
+        return redirect(url_for("document", doc_id=doc.id))
 
     return app
 

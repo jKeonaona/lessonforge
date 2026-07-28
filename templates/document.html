@@ -1,18 +1,44 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="card">
-  <div class="tag">{{ doc.status }}</div>
-  <h2 style="margin:6px 0 0">{{ doc.filename }}</h2>
-  <p style="font-size:13px;color:#737272">
-    {{ blocks|length }} blocks extracted.
-    <a href="{{ url_for('index') }}">Back</a>
-  </p>
-  <form method="post"
-        action="{{ url_for('correct', doc_id=doc.id) }}">
-    <button type="submit">Run correction pass</button>
+  <div class="tag">{{ label.get(phase, phase) }}</div>
+  <form method="post" action="{{ url_for('set_title', doc_id=doc.id) }}"
+        style="margin:6px 0 2px">
+    <input type="text" name="title" value="{{ doc.title or '' }}"
+           placeholder="Lesson title"
+           style="font-size:20px;font-weight:bold;border:1px solid #ddd;
+                  padding:6px;width:65%;font-family:Arial">
+    <button type="submit" style="background:#737272">Save title</button>
   </form>
-  <p style="font-size:13px;margin-top:10px">
-    <a href="{{ url_for('review', doc_id=doc.id) }}">Review corrections</a>
+  <div style="font-size:12px;color:#737272;margin-bottom:12px">
+    source: {{ doc.filename }} &middot; {{ blocks|length }} blocks
+  </div>
+
+  {% if phase == 'extracted' %}
+    <form method="post" action="{{ url_for('correct', doc_id=doc.id) }}">
+      <button type="submit">Run correction pass</button>
+    </form>
+  {% elif phase == 'corrections_pending' %}
+    <a href="{{ url_for('review', doc_id=doc.id) }}">
+      <button type="button">Review pending corrections</button></a>
+  {% elif phase == 'english_ready' %}
+    <form method="post" action="{{ url_for('correct', doc_id=doc.id) }}"
+          style="display:inline">
+      <button type="submit" style="background:#737272">Run pass again</button>
+    </form>
+    <form method="post" action="{{ url_for('lock_english', doc_id=doc.id) }}"
+          style="display:inline">
+      <button type="submit">Finalize English</button>
+    </form>
+  {% elif phase == 'english_locked' %}
+    <form method="post" action="{{ url_for('unlock_english', doc_id=doc.id) }}">
+      <button type="submit" style="background:#737272">Unlock English</button>
+    </form>
+  {% endif %}
+
+  <p style="font-size:13px;margin-top:12px">
+    <a href="{{ url_for('review', doc_id=doc.id) }}">Correction history</a>
+    &middot; <a href="{{ url_for('index') }}">All documents</a>
   </p>
 </div>
 

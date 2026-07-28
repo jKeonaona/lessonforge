@@ -13,9 +13,9 @@
     <tr><th>File</th><th>Uploaded</th><th>Status</th><th>Blocks</th></tr>
     {% for d in docs %}
     <tr>
-      <td><a href="{{ url_for('document', doc_id=d.id) }}">{{ d.filename }}</a></td>
+      <td><a href="{{ url_for('document', doc_id=d.id) }}">{{ d.title or d.filename }}</a></td>
       <td>{{ d.uploaded_at.strftime('%Y-%m-%d %H:%M') }}</td>
-      <td>{{ d.status }}</td>
+      <td>{{ label.get(phase(d), phase(d)) }}</td>
       <td>{{ d.blocks|length }}</td>
     </tr>
     {% else %}
