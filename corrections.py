@@ -50,34 +50,43 @@ def run_correction_pass(doc_id, actor="system"):
         return 0
 
     by_seq = {b.seq: b for b in blocks}
+    seen = {
+        c.block_id for c in ChangeLog.query.filter_by(phase="correction")
+        .filter(ChangeLog.block_id.in_([b.id for b in blocks])).all()
+    }
 
-    payload = "\n".join(
-        "[%d] %s" % (b.seq, b.text_en or "") for b in blocks
-    )
+    def chunk(seq, n):
+        for i in range(0, len(seq), n):
+            yield seq[i:i + n]
 
-    resp = _client().messages.create(
-        model=MODEL,
-        max_tokens=8000,
-        system=SYSTEM,
-        messages=[{"role": "user", "content": payload}],
-    )
-
-    raw = "".join(
-        p.text for p in resp.content if getattr(p, "type", "") == "text"
-    ).strip()
-
-    if raw.startswith("```"):
-        raw = raw.split("```")[1]
-        if raw.startswith("json"):
-            raw = raw[4:]
-        raw = raw.strip()
-
-    items = json.loads(raw)
+    items = []
+    for group in chunk(blocks, 10):
+        payload = "\n".join(
+            "[%d] %s" % (b.seq, b.text_en or "") for b in group
+        )
+        resp = _client().messages.create(
+            model=MODEL,
+            max_tokens=4000,
+            system=SYSTEM,
+            messages=[{"role": "user", "content": payload}],
+        )
+        raw = "".join(
+            p.text for p in resp.content
+            if getattr(p, "type", "") == "text"
+        ).strip()
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+            raw = raw.strip()
+        items.extend(json.loads(raw))
 
     created = 0
     for item in items:
         blk = by_seq.get(item.get("seq"))
         if not blk:
+            continue
+        if blk.id in seen:
             continue
         after = (item.get("corrected") or "").strip()
         if not after or after == (blk.text_en or "").strip():
