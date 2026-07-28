@@ -11,6 +11,7 @@ from corrections import run_correction_pass, apply_change, reject_change
 from translate import (run_translation_pass, edit_translation,
                        verify_translations, translate_title)
 from render import build_docx, docx_filename
+from batch import ingest, run_pipeline
 
 
 def create_app():
@@ -38,46 +39,45 @@ def create_app():
 
     @app.route("/upload", methods=["POST"])
     def upload():
-        f = request.files.get("pdf")
-        if not f or not f.filename.lower().endswith(".pdf"):
-            flash("Select a PDF file.")
+        files = request.files.getlist("pdf")
+        files = [f for f in files
+                 if f and f.filename.lower().endswith(".pdf")]
+        if not files:
+            flash("Select one or more PDF files.")
             return redirect(url_for("index"))
 
-        data = f.read()
-        digest = hashlib.sha256(data).hexdigest()
+        auto = request.form.get("auto") == "on"
+        made = []
+        skipped = 0
+        for f in files:
+            doc, msg = ingest(f.read(), secure_filename(f.filename),
+                              app.config["UPLOAD_FOLDER"])
+            if doc is None:
+                skipped += 1
+            else:
+                made.append(doc)
 
-        existing = SourceDocument.query.filter_by(sha256=digest).first()
-        if existing:
-            flash("That file was already uploaded.")
-            return redirect(url_for("document", doc_id=existing.id))
+        results = []
+        if auto:
+            for doc in made:
+                results.append("%s: %s" % (doc.filename,
+                                           run_pipeline(doc.id)))
 
-        name = secure_filename(f.filename)
-        path = os.path.join(app.config["UPLOAD_FOLDER"], digest + ".pdf")
-        with open(path, "wb") as out:
-            out.write(data)
+        parts = ["%d uploaded" % len(made)]
+        if skipped:
+            parts.append("%d duplicates skipped" % skipped)
+        flash(", ".join(parts))
+        for r in results:
+            flash(r)
 
-        doc = SourceDocument(filename=name, sha256=digest,
-                             status="extracting")
-        db.session.add(doc)
-        db.session.commit()
+        if len(made) == 1 and not auto:
+            return redirect(url_for("document", doc_id=made[0].id))
+        return redirect(url_for("index"))
 
-        try:
-            parsed, title = extract_blocks(path)
-            doc.title = title
-            for b in parsed:
-                db.session.add(Block(
-                    source_doc_id=doc.id,
-                    seq=b["seq"],
-                    block_type=b["block_type"],
-                    text_en=b["text_en"],
-                ))
-            doc.status = "extracted"
-            db.session.commit()
-        except Exception as exc:
-            doc.status = "extract_failed"
-            db.session.commit()
-            flash("Extraction failed: %s" % exc)
-
+    @app.route("/document/<int:doc_id>/pipeline", methods=["POST"])
+    def pipeline(doc_id):
+        doc = SourceDocument.query.get_or_404(doc_id)
+        flash("%s: %s" % (doc.filename, run_pipeline(doc.id)))
         return redirect(url_for("document", doc_id=doc.id))
 
     @app.route("/document/<int:doc_id>")
