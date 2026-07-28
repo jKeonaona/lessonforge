@@ -9,7 +9,7 @@ from models import (db, SourceDocument, Block, ChangeLog,
 from extract import extract_blocks
 from corrections import run_correction_pass, apply_change, reject_change
 from translate import (run_translation_pass, edit_translation,
-                       verify_translations)
+                       verify_translations, translate_title)
 from render import build_docx, docx_filename
 
 
@@ -211,6 +211,7 @@ def create_app():
             return redirect(url_for("document", doc_id=doc.id))
         try:
             n = run_translation_pass(doc.id)
+            translate_title(doc.id)
             flash("%d blocks translated." % n)
         except Exception as exc:
             flash("Translation failed: %s" % exc)

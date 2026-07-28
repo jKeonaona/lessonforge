@@ -59,8 +59,11 @@ def build_docx(doc, lang="en"):
 
     title = d.add_paragraph()
     title.paragraph_format.space_after = Pt(2)
-    _run(title, doc.title or doc.filename, size=20, bold=True,
-         color=CCC_BLUE)
+    if lang == "es":
+        heading_text = doc.title_es or doc.title or doc.filename
+    else:
+        heading_text = doc.title or doc.filename
+    _run(title, heading_text, size=20, bold=True, color=CCC_BLUE)
 
     rule = d.add_paragraph()
     rule.paragraph_format.space_before = Pt(0)
@@ -91,9 +94,12 @@ def build_docx(doc, lang="en"):
             _run(p, text)
 
     foot = d.sections[0].footer.paragraphs[0]
-    label = "Español (México)" if lang == "es" else "English"
-    _run(foot, "Revision %s  |  %s" % (doc.revision or "1.0", label),
-         size=8, color=GRAY)
+    if lang == "es":
+        foot_text = "Revisión %s  |  Español (México)" % (
+            doc.revision or "1.0")
+    else:
+        foot_text = "Revision %s  |  English" % (doc.revision or "1.0")
+    _run(foot, foot_text, size=8, color=GRAY)
 
     buf = io.BytesIO()
     d.save(buf)
@@ -102,4 +108,5 @@ def build_docx(doc, lang="en"):
 
 
 def docx_filename(doc, lang="en"):
-    return "%s-%s.docx" % (slug(doc.title or doc.filename), lang.upper())
+    base = doc.title_es if (lang == "es" and doc.title_es) else doc.title
+    return "%s-%s.docx" % (slug(base or doc.filename), lang.upper())

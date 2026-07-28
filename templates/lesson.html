@@ -23,7 +23,7 @@
 <div class="card" style="padding:40px 48px">
   <h1 style="font-family:Arial;font-size:26px;color:#00AEEF;
              margin:0 0 4px;letter-spacing:.5px">
-    {{ doc.title or doc.filename }}</h1>
+    {% if lang == 'es' %}{{ doc.title_es or doc.title or doc.filename }}{% else %}{{ doc.title or doc.filename }}{% endif %}</h1>
   <div style="border-bottom:3px solid #00AEEF;margin-bottom:24px"></div>
 
   {% for item in rendered %}

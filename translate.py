@@ -18,9 +18,17 @@ Requirements:
 - Preserve emphasis. If the English capitalizes NOT or uses bold-like
   emphasis, carry that emphasis into the Spanish.
 - Never translate, renumber, or localize regulatory citations, standard
-  numbers, part numbers, or measurements. Leave 29 CFR 1926.62,
-  8 CCR 3395, ANSI Z87.1, 42 inches, 25 mph, 61-220 pounds exactly
-  as written in the source.
+  numbers, or part numbers. Leave 29 CFR 1926.62, 8 CCR 3395, and
+  ANSI Z87.1 exactly as written.
+- Numeric VALUES never change, but unit WORDS must be translated into
+  Spanish. Do not convert between measurement systems. Examples:
+    42 inches      -> 42 pulgadas
+    25 mph         -> 25 mph
+    61-220 pounds  -> 61-220 libras
+    8 feet         -> 8 pies
+    5 1/2 feet     -> 5 1/2 pies
+    100 degrees F  -> 100 grados F
+  The number stays identical. Only the unit word is translated.
 - Do not add, remove, soften, or explain content. Translate what is
   there.
 - Do not translate proper nouns or agency names.
@@ -53,7 +61,11 @@ Report a problem ONLY if the meaning changed in a way that matters for
 worker safety:
 - A negation was added, dropped, or inverted.
 - An instruction became a suggestion, or a prohibition became optional.
-- A number, measurement, or citation changed.
+- A numeric value, measurement, or citation changed. Note that unit
+  words are expected to be in Spanish in the translation and then back
+  in English in the back-translation, so "libras" appearing as "pounds"
+  is correct and must NOT be reported. Only report a problem if the
+  NUMBER itself changed or a unit was converted to a different system.
 - An agency, body part, equipment type, or hazard was swapped for a
   different one.
 - Content was added that was not in the original.
@@ -255,3 +267,29 @@ def verify_translations(doc_id, actor="system"):
 
     db.session.commit()
     return (approved, len(flagged))
+
+
+TITLE_SYSTEM = """Translate this workplace safety training document
+title into Mexican Spanish. Return ONLY the translated title as plain
+text, with no quotes, no explanation, and no punctuation added.
+Preserve title capitalization conventions."""
+
+
+def translate_title(doc_id):
+    """Translate the document title into es-MX."""
+    from models import SourceDocument
+    doc = SourceDocument.query.get(doc_id)
+    if not doc or not doc.title:
+        return None
+    resp = _client().messages.create(
+        model=MODEL, max_tokens=200, system=TITLE_SYSTEM,
+        messages=[{"role": "user", "content": doc.title}],
+    )
+    es = "".join(
+        p.text for p in resp.content
+        if getattr(p, "type", "") == "text"
+    ).strip().strip('"')
+    if es:
+        doc.title_es = es
+        db.session.commit()
+    return es
