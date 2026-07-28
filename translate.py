@@ -34,6 +34,41 @@ Each element must be:
   {"seq": <int>, "es": "<the Spanish translation of that block>"}
 Return one element for every block you were given."""
 
+BACK_SYSTEM = """You are given Spanish safety training text. Translate
+it back into plain English as literally as possible.
+
+Do not improve, smooth, or interpret. If the Spanish is awkward, the
+English should be awkward. If the Spanish omits something, omit it.
+Your output is used to detect translation errors, so fidelity to the
+Spanish matters more than readability.
+
+Return ONLY a JSON array, no markdown fences and no commentary:
+  {"seq": <int>, "en": "<literal English of that block>"}
+Return one element for every block you were given."""
+
+COMPARE_SYSTEM = """You compare an original English safety instruction
+against a back-translation of its Spanish version.
+
+Report a problem ONLY if the meaning changed in a way that matters for
+worker safety:
+- A negation was added, dropped, or inverted.
+- An instruction became a suggestion, or a prohibition became optional.
+- A number, measurement, or citation changed.
+- An agency, body part, equipment type, or hazard was swapped for a
+  different one.
+- Content was added that was not in the original.
+- Content was dropped that changes what the worker should do.
+
+Do NOT report:
+- Wording, phrasing, or style differences.
+- Synonyms that mean the same thing.
+- Word order, article, or tense differences.
+- Anything where a worker would still take the same action.
+
+Return ONLY a JSON array, no markdown fences and no commentary:
+  {"seq": <int>, "issue": "<one short sentence naming the problem>"}
+Return an empty array [] if no block has a meaning-level problem."""
+
 
 def _client():
     return Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
@@ -141,3 +176,82 @@ def edit_translation(block_id, new_es, actor="john"):
     blk.status_es = "approved"
     db.session.commit()
     return True
+
+
+def verify_translations(doc_id, actor="system"):
+    """Back-translate each block and compare to the original English.
+    Blocks that pass are auto-approved. Blocks that fail are flagged
+    for human review. Returns (approved, flagged)."""
+    blocks = (Block.query.filter_by(source_doc_id=doc_id)
+              .order_by(Block.seq).all())
+    todo = [b for b in blocks
+            if b.text_es and b.status_es == "proposed"]
+    if not todo:
+        return (0, 0)
+
+    by_seq = {b.seq: b for b in todo}
+
+    def chunk(seq, n):
+        for i in range(0, len(seq), n):
+            yield seq[i:i + n]
+
+    def call(system, payload):
+        resp = _client().messages.create(
+            model=MODEL, max_tokens=8000, system=system,
+            messages=[{"role": "user", "content": payload}],
+        )
+        raw = "".join(
+            p.text for p in resp.content
+            if getattr(p, "type", "") == "text"
+        ).strip()
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+            raw = raw.strip()
+        try:
+            return json.loads(raw)
+        except ValueError:
+            return []
+
+    flagged = {}
+    for group in chunk(todo, 8):
+        back = call(BACK_SYSTEM, "\n".join(
+            "[%d] %s" % (b.seq, b.text_es) for b in group))
+        back_by_seq = {i.get("seq"): (i.get("en") or "") for i in back}
+
+        pairs = []
+        for b in group:
+            bt = back_by_seq.get(b.seq)
+            if not bt:
+                flagged[b.seq] = "Back-translation returned nothing."
+                continue
+            pairs.append(
+                "[%d]\nORIGINAL: %s\nBACK: %s" % (b.seq, b.text_en, bt))
+
+        if pairs:
+            for item in call(COMPARE_SYSTEM, "\n\n".join(pairs)):
+                seq = item.get("seq")
+                if seq in by_seq:
+                    flagged[seq] = item.get("issue") or "Meaning changed."
+
+    approved = 0
+    for b in todo:
+        if b.seq in flagged:
+            b.status_es = "flagged"
+            db.session.add(ChangeLog(
+                block_id=b.id, phase="translation_verify",
+                before=b.text_en, after=b.text_es,
+                status="flagged", actor=flagged[b.seq][:60],
+            ))
+        else:
+            b.status_es = "approved"
+            db.session.add(ChangeLog(
+                block_id=b.id, phase="translation_verify",
+                before=b.text_en, after=b.text_es,
+                status="auto_approved", actor="claude",
+            ))
+            approved += 1
+
+    db.session.commit()
+    return (approved, len(flagged))

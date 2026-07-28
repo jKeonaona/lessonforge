@@ -4,17 +4,43 @@
   <div class="tag">spanish review</div>
   <h2 style="margin:6px 0 0">{{ doc.title or doc.filename }}</h2>
   <p style="font-size:13px;color:#737272">
-    {{ approved }} of {{ total }} blocks approved.
+    {{ approved }} of {{ total }} approved &middot;
+    {{ flagged|length }} flagged for review.
     <a href="{{ url_for('document', doc_id=doc.id) }}">Back</a>
   </p>
-  {% if approved < total %}
-  <form method="post" action="{{ url_for('translate_doc', doc_id=doc.id) }}">
-    <button type="submit">Run translation pass</button>
+  <form method="post" action="{{ url_for('translate_doc', doc_id=doc.id) }}"
+        style="display:inline">
+    <button type="submit" style="background:#737272">Run translation pass</button>
   </form>
-  {% endif %}
+  <form method="post" action="{{ url_for('verify_doc', doc_id=doc.id) }}"
+        style="display:inline">
+    <button type="submit">Verify and auto-approve</button>
+  </form>
 </div>
 
-{% for b in blocks %}
+{% if flagged %}
+<div class="card" style="border-left:4px solid #cc4444">
+  <div class="tag">needs your review</div>
+  {% for b in flagged %}
+  <div style="padding:12px 0;border-bottom:1px solid #eee">
+    <div style="font-size:12px;color:#cc4444;margin-bottom:6px">
+      Block {{ b.seq }}: {{ flags.get(b.id, 'Meaning changed.') }}</div>
+    <div style="font-size:13px;background:#f7f7f7;padding:8px;
+                margin-bottom:6px">{{ b.text_en }}</div>
+    <form method="post"
+          action="{{ url_for('save_translation', block_id=b.id) }}">
+      <textarea name="es" rows="3"
+                style="width:100%;font-family:Arial;font-size:13px;
+                       padding:8px;border:1px solid #ccc;
+                       border-left:3px solid #cc4444">{{ b.text_es }}</textarea>
+      <button type="submit">Approve this block</button>
+    </form>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% for b in blocks if b.status_es != 'flagged' %}
 <div class="card">
   <div class="tag">block {{ b.seq }} &middot; {{ b.block_type }}
     &middot; {{ b.status_es }}</div>

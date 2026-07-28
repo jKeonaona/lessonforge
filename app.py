@@ -8,7 +8,8 @@ from models import (db, SourceDocument, Block, ChangeLog,
                     doc_phase, PHASE_LABEL)
 from extract import extract_blocks
 from corrections import run_correction_pass, apply_change, reject_change
-from translate import run_translation_pass, edit_translation
+from translate import (run_translation_pass, edit_translation,
+                       verify_translations)
 
 
 def create_app():
@@ -184,8 +185,17 @@ def create_app():
         blocks = (Block.query.filter_by(source_doc_id=doc.id)
                   .order_by(Block.seq).all())
         approved = sum(1 for b in blocks if b.status_es == "approved")
+        flags = {}
+        ids = [b.id for b in blocks]
+        for c in (ChangeLog.query
+                  .filter(ChangeLog.block_id.in_(ids))
+                  .filter(ChangeLog.phase == "translation_verify")
+                  .filter(ChangeLog.status == "flagged").all()):
+            flags[c.block_id] = c.actor
+        flagged = [b for b in blocks if b.status_es == "flagged"]
         return render_template("translate.html", doc=doc, blocks=blocks,
-                               approved=approved, total=len(blocks))
+                               approved=approved, total=len(blocks),
+                               flagged=flagged, flags=flags)
 
     @app.route("/document/<int:doc_id>/translate", methods=["POST"])
     def translate_doc(doc_id):
@@ -205,6 +215,16 @@ def create_app():
         blk = Block.query.get_or_404(block_id)
         edit_translation(block_id, (request.form.get("es") or "").strip())
         return redirect(url_for("spanish", doc_id=blk.source_doc_id))
+
+    @app.route("/document/<int:doc_id>/verify", methods=["POST"])
+    def verify_doc(doc_id):
+        doc = SourceDocument.query.get_or_404(doc_id)
+        try:
+            ok, bad = verify_translations(doc.id)
+            flash("%d auto-approved, %d flagged for review." % (ok, bad))
+        except Exception as exc:
+            flash("Verification failed: %s" % exc)
+        return redirect(url_for("spanish", doc_id=doc.id))
 
     return app
 
