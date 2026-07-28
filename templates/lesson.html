@@ -12,6 +12,12 @@
     &middot; <a href="{{ url_for('review', doc_id=doc.id) }}">Correction history</a>
     &middot; <a href="{{ url_for('index') }}">All documents</a>
   </p>
+  <div style="margin-top:10px">
+    <a href="{{ url_for('download_docx', doc_id=doc.id) }}">
+      <button type="button" style="background:#737272">Download English DOCX</button></a>
+    <a href="{{ url_for('download_docx', doc_id=doc.id, lang='es') }}">
+      <button type="button">Download Spanish DOCX</button></a>
+  </div>
 </div>
 
 <div class="card" style="padding:40px 48px">

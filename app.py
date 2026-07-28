@@ -1,7 +1,7 @@
 import hashlib
 import os
 from flask import (Flask, jsonify, render_template, request,
-                   redirect, url_for, flash)
+                   redirect, url_for, flash, send_file)
 from werkzeug.utils import secure_filename
 from config import Config
 from models import (db, SourceDocument, Block, ChangeLog,
@@ -10,6 +10,7 @@ from extract import extract_blocks
 from corrections import run_correction_pass, apply_change, reject_change
 from translate import (run_translation_pass, edit_translation,
                        verify_translations)
+from render import build_docx, docx_filename
 
 
 def create_app():
@@ -230,6 +231,19 @@ def create_app():
         except Exception as exc:
             flash("Verification failed: %s" % exc)
         return redirect(url_for("spanish", doc_id=doc.id))
+
+    @app.route("/document/<int:doc_id>/docx")
+    def download_docx(doc_id):
+        doc = SourceDocument.query.get_or_404(doc_id)
+        lang = request.args.get("lang", "en")
+        buf = build_docx(doc, lang)
+        return send_file(
+            buf,
+            as_attachment=True,
+            download_name=docx_filename(doc, lang),
+            mimetype="application/vnd.openxmlformats-officedocument"
+                     ".wordprocessingml.document",
+        )
 
     return app
 
