@@ -8,6 +8,7 @@ from models import (db, SourceDocument, Block, ChangeLog,
                     doc_phase, PHASE_LABEL)
 from extract import extract_blocks
 from corrections import run_correction_pass, apply_change, reject_change
+from translate import run_translation_pass, edit_translation
 
 
 def create_app():
@@ -176,6 +177,34 @@ def create_app():
                 rendered.append({"kind": "paragraph", "text": text})
         return render_template("lesson.html", doc=doc, rendered=rendered,
                                phase=doc_phase(doc), label=PHASE_LABEL)
+
+    @app.route("/document/<int:doc_id>/spanish")
+    def spanish(doc_id):
+        doc = SourceDocument.query.get_or_404(doc_id)
+        blocks = (Block.query.filter_by(source_doc_id=doc.id)
+                  .order_by(Block.seq).all())
+        approved = sum(1 for b in blocks if b.status_es == "approved")
+        return render_template("translate.html", doc=doc, blocks=blocks,
+                               approved=approved, total=len(blocks))
+
+    @app.route("/document/<int:doc_id>/translate", methods=["POST"])
+    def translate_doc(doc_id):
+        doc = SourceDocument.query.get_or_404(doc_id)
+        if not doc.english_locked:
+            flash("Finalize English before translating.")
+            return redirect(url_for("document", doc_id=doc.id))
+        try:
+            n = run_translation_pass(doc.id)
+            flash("%d blocks translated." % n)
+        except Exception as exc:
+            flash("Translation failed: %s" % exc)
+        return redirect(url_for("spanish", doc_id=doc.id))
+
+    @app.route("/block/<int:block_id>/translation", methods=["POST"])
+    def save_translation(block_id):
+        blk = Block.query.get_or_404(block_id)
+        edit_translation(block_id, (request.form.get("es") or "").strip())
+        return redirect(url_for("spanish", doc_id=blk.source_doc_id))
 
     return app
 

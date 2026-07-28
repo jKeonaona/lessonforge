@@ -33,7 +33,10 @@
       <button type="submit">Finalize English</button>
     </form>
   {% elif phase == 'english_locked' %}
-    <form method="post" action="{{ url_for('unlock_english', doc_id=doc.id) }}">
+    <a href="{{ url_for('spanish', doc_id=doc.id) }}">
+      <button type="button">Spanish translation</button></a>
+    <form method="post" action="{{ url_for('unlock_english', doc_id=doc.id) }}"
+          style="display:inline">
       <button type="submit" style="background:#737272">Unlock English</button>
     </form>
   {% endif %}
