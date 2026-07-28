@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <div class="tag">{{ doc.status }}</div>
+  <h2 style="margin:6px 0 0">{{ doc.filename }}</h2>
+  <p style="font-size:13px;color:#737272">
+    {{ blocks|length }} blocks extracted.
+    <a href="{{ url_for('index') }}">Back</a>
+  </p>
+</div>
+
+<div class="card">
+  {% for b in blocks %}
+  <div class="blk">
+    <span class="tag">{{ b.seq }} / {{ b.block_type }}</span>
+    <div class="{% if b.block_type == 'heading' %}h{% elif b.block_type == 'list_item' %}li{% endif %}">{{ b.text_en }}</div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LessonForge</title>
+<style>
+  body { font-family: Arial, Helvetica, sans-serif; margin: 0;
+         background: #f5f6f7; color: #222; }
+  header { background: #00AEEF; color: #fff; padding: 14px 24px; }
+  header h1 { margin: 0; font-size: 18px; letter-spacing: .5px; }
+  main { max-width: 900px; margin: 24px auto; padding: 0 16px; }
+  .card { background: #fff; border: 1px solid #ddd; border-radius: 4px;
+          padding: 18px; margin-bottom: 18px; }
+  .flash { background: #fff6d6; border: 1px solid #e0c860;
+           padding: 10px; margin-bottom: 14px; border-radius: 4px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 8px; border-bottom: 1px solid #eee;
+           font-size: 14px; }
+  th { color: #737272; font-weight: bold; }
+  a { color: #00AEEF; }
+  .tag { font-size: 11px; text-transform: uppercase; color: #737272;
+         letter-spacing: .5px; }
+  .blk { padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
+  .blk .h { font-weight: bold; }
+  .blk .li { padding-left: 18px; }
+  button { background: #00AEEF; color: #fff; border: 0; padding: 9px 16px;
+           border-radius: 3px; cursor: pointer; font-size: 14px; }
+</style>
+</head>
+<body>
+<header><h1>LessonForge</h1></header>
+<main>
+{% with msgs = get_flashed_messages() %}
+  {% for m in msgs %}<div class="flash">{{ m }}</div>{% endfor %}
+{% endwith %}
+{% block content %}{% endblock %}
+</main>
+</body>
+</html>
