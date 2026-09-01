@@ -309,4 +309,10 @@ app = create_app()
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 6100))
-    app.run(host="0.0.0.0", port=port)
+    # Loopback only. nginx serves lessonforge.ccctrainingonline.com and proxies
+    # to http://127.0.0.1:6100, so binding every interface never served a real
+    # request -- it just left this app answering on its raw port over plain
+    # http, outside the certificate. LessonForge has no login of any kind, and
+    # an upload here spends the Anthropic API key, so the raw port was the
+    # whole front door. Changed 2026-09-01.
+    app.run(host="127.0.0.1", port=port)
